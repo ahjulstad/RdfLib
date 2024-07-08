@@ -1,0 +1,9 @@
+name = "RdfLib"
+uuid = "de2b52a7-08db-46b7-9d16-77bbe0f24f3d"
+authors = ["Åsmund Hjulstad <ahju@equinor.com>"]
+version = "0.1.0"
+
+[deps]
+CondaPkg = "992eb4ea-22a4-4c89-a5bb-47a3300528ab"
+PreferenceTools = "ba661fbb-e901-4445-b070-854aec6bfbc5"
+PythonCall = "6099a3de-0909-46bc-b1f4-468b9a2dfc0d"
