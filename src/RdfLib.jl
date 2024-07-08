@@ -37,9 +37,18 @@ function Base.:(/)(u1::URIRef, u2::URIRef)
     u1.u / u2.u
 end
 
+struct OneOrMore end
+const oneormore = OneOrMore()
+const ⊕ = oneormore
+
+function Base.:(*)(u::URIRef, o::OneOrMore)
+    pymul(u.u,"+")
+end
+
 struct BNode
     b::Py
     BNode(v) = new(pyrdf[].BNode(v))
+    BNode() = new(pyrdf[].BNode())
 end
 Base.convert(::Type{Py}, b::BNode) = b.b
 
@@ -97,7 +106,9 @@ end
 
 function call_triples(g::Py, s::Py, p::Py, o::Py)
     try
-        return g.triples((s, p, o))
+        it = g.triples((s, p, o))
+        pyit = PyIterable(it)
+        return Iterators.map(x -> Triple(x[0], x[1], x[2]), pyit)
     catch e
         if e isa PythonCall.PyException
             error("Python error in call_triples: $(e.exc)")
@@ -107,15 +118,27 @@ function call_triples(g::Py, s::Py, p::Py, o::Py)
     end
 end
 
-function Base.push!(g::RdfGraph, (s, p, o))
-    call_add(g.g, convert(Py, s), convert(Py, p), convert(Py, o))
+function to_py(x::Nothing)
+    Py(x)
 end
+
+function to_py(x)
+    convert(Py, x)
+end
+
+function Base.push!(g::RdfGraph, (s, p, o))
+    s,p,o = to_py.((s,p,o))
+    call_add(g.g, s, p, o)
+end
+
+
 
 function triples(g::RdfGraph, (s, p, o))
-    return call_triples(g.g, convert(Py, s), convert(Py, p), convert(Py, o))
+    s,p,o = to_py.((s,p,o))
+    return call_triples(g.g, s,p,o)
 end
 
-export graph, push!, triples, Literal, URIRef, BNode, Namespace, Triple
+export graph, push!, triples, Literal, URIRef, BNode, Namespace, Triple, oneormore, ⊕
 
 
 
