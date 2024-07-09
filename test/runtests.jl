@@ -26,16 +26,23 @@ end
 
 @assert length(collect(triples(g, (nothing, pred1 | pred2, nothing)))) == 2
 
-g = graph()
+g2 = graph()
 
 tempnode = BNode()
 
-push!(g, (subject, p_chained, tempnode))
-push!(g, (tempnode, p_chained, Literal("Hello2")))
+push!(g2, (subject, p_chained, tempnode))
+push!(g2, (tempnode, p_chained, Literal("Hello2")))
 
 p_chained*oneormore
 
-for a in triples(g, (nothing, p_chained*⊕, nothing))
+for a in triples(g2, (nothing, p_chained*⊕, nothing))
+    println(a)
+end
+@assert length(collect(triples(g2, (nothing, p_chained*⊕, nothing)))) == 3
+
+for a in g2
     println(a)
 end
 
+union!(g,g2)
+@assert length(g) == 5

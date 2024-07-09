@@ -1,13 +1,15 @@
 module RdfLib
 
-import Base: push!
+import Base: push!, iterate, length, union!
 
 using PythonCall
+import PythonCall: pyconvert
 
 const pyrdf = Ref{Py}()
 function __init__()
   pyrdf[] = pyimport("rdflib")
 end
+
 
 struct RdfGraph
     g::Union{Py, Nothing} 
@@ -15,6 +17,14 @@ struct RdfGraph
     RdfGraph(g) = new(g)
 end
 Base.convert(::Type{Py}, g::RdfGraph) = g.g
+ispy(x::RdfGraph) = true
+Py(x::RdfGraph) = x.g
+
+Base.iterate(g::RdfGraph) = Base.iterate(PyIterable{Triple}(g.g))
+Base.iterate(g::RdfGraph, state) = Base.iterate(PyIterable{Triple}(g.g), state)
+Base.length(g::RdfGraph) = pylen(g.g)
+Base.:(+)(g::RdfGraph, g2::RdfGraph) = RdfGraph(g.g + g2.g)
+Base.union!(g::RdfGraph, g2::RdfGraph) = pyiadd(g.g, g2.g)
 
 struct Literal
     l::Py
@@ -22,12 +32,19 @@ struct Literal
 end
 Base.convert(::Type{Py}, l::Literal) = l.l
 Base.convert(::Type{String}, l::Literal) = l.l.n3()
+ispy(x::Literal) = true
+Py(x::Literal) = x.l
+
+
+### URIRefs and path arithmetic
 
 struct URIRef
     u::Py
     URIRef(v) = new(pyrdf[].URIRef(v))
 end
 Base.convert(::Type{Py}, u::URIRef) = u.u
+ispy(x::URIRef) = true
+Py(x::URIRef) = x.u
 
 function Base.:(|)(u1::URIRef, u2::URIRef)
     u1.u | u2.u
@@ -41,8 +58,29 @@ struct OneOrMore end
 const oneormore = OneOrMore()
 const ⊕ = oneormore
 
+struct ZeroOrMore end
+const zeroormore = ZeroOrMore()
+const ✴ = zeroormore
+
+struct ZeroOrOne end
+const zeroorone = ZeroOrOne()
+const ❔ = zeroorone
+
+
 function Base.:(*)(u::URIRef, o::OneOrMore)
     pymul(u.u,"+")
+end
+
+function Base.:(*)(u::URIRef, o::ZeroOrMore)
+    pymul(u.u,"*")
+end
+
+function Base.:(*)(u::URIRef, o::ZeroOrOne)
+    pymul(u.u,"?")
+end
+
+function Base.:(~)(u::URIRef)
+    ~(u.u)
 end
 
 struct BNode
@@ -51,11 +89,17 @@ struct BNode
     BNode() = new(pyrdf[].BNode())
 end
 Base.convert(::Type{Py}, b::BNode) = b.b
+ispy(x::BNode) = true
+Py(x::BNode) = x.b
+
 
 struct Namespace
     _ns::Py
     Namespace(v) = new(pyrdf[].Namespace(v))  
 end
+
+ispy(x::Namespace) = true
+py(x::Namespace) = x._ns
 
 function Base.getproperty(ns::Namespace, name::Symbol)
     if hasfield(Namespace, name)
@@ -72,6 +116,14 @@ struct Triple
     p
     o
     Triple(s, p, o) = new(s, p, o)
+    Triple((s, p, o)) = new(s, p, o)
+end
+function pyconvert(::Type{Triple}, t::Py)
+    if pyhasattr(t, "subject") && pyhasattr(t, "predicate") && pyhasattr(t, "object")
+        return Triple(t.subject, t.predicate, t.object)
+    else
+        return Triple(t[0], t[1], t[2])
+    end
 end
 
 
@@ -89,6 +141,8 @@ function graph(document::String, format::String)
 end
 
 export RdfGraph
+
+
 
 
 # Adding triples 
